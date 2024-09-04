@@ -40,6 +40,15 @@ const htmlTemplate = `
 `
 
 func main() {
+
+	// change the code to incorporate csv file processing in the main file itself, then the csv attribute processing should be done
+	// by the handlers
+	// reduce handlers to just the root handler with some sub-routes for smoother api handling
+	// first scan the csv to extract the attribute headers, then proceed to give the users the headers as options to do stuff with
+	// the data should be processed index wise to either calculate the number of grades in aa particular segment or count the number of students passed
+	// in a particular subject after which the data should be passed to the chart rendering functions, but i still need to understannd
+	// how exactly go-echarts works , in the sense that how the data is passed to the chart rendering functions like opts.AddSeries() and opts.AddData()
+	// then i just need to return a html blob of the chart to the user with the download button.
 	http.HandleFunc("/pie-chart", pieChartHandler)
 	http.HandleFunc("/bar-chart", barChartHandler)
 	http.HandleFunc("/line-chart", lineChartHandler)
