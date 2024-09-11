@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -111,16 +112,25 @@ func renderChart(w http.ResponseWriter, chartType string, data GradeData, column
 		http.Error(w, "Invalid chart type", http.StatusBadRequest)
 		return
 	}
-
 }
 
 func createPieChart(data map[string]int, title string, w http.ResponseWriter) {
 	pie := charts.NewPie()
 	pie.SetGlobalOptions(charts.WithTitleOpts(opts.Title{Title: title}))
 
-	items := make([]opts.PieData, 0, len(data))
-	for label, value := range data {
-		items = append(items, opts.PieData{Name: label, Value: value})
+	// Group the data
+	groupedData := groupGrades(data)
+
+	// Sort the labels
+	var labels []string
+	for label := range groupedData {
+		labels = append(labels, label)
+	}
+	sort.Strings(labels)
+
+	items := make([]opts.PieData, 0, len(groupedData))
+	for _, label := range labels {
+		items = append(items, opts.PieData{Name: label, Value: groupedData[label]})
 	}
 	pie.AddSeries(title, items)
 
@@ -134,12 +144,23 @@ func createBarChart(data map[string]int, title string, w http.ResponseWriter) {
 	bar := charts.NewBar()
 	bar.SetGlobalOptions(charts.WithTitleOpts(opts.Title{Title: title}))
 
+	// Group the data into ranges
+	groupedData := groupGrades(data)
+
 	var labels []string
 	var values []opts.BarData
-	for label, value := range data {
+
+	// Sort the labels
+	for label := range groupedData {
 		labels = append(labels, label)
-		values = append(values, opts.BarData{Value: value})
 	}
+	sort.Strings(labels)
+
+	// Add sorted data to the chart
+	for _, label := range labels {
+		values = append(values, opts.BarData{Value: groupedData[label]})
+	}
+
 	bar.SetXAxis(labels).AddSeries(title, values)
 
 	err := bar.Render(w)
@@ -152,16 +173,45 @@ func createLineChart(data map[string]int, title string, w http.ResponseWriter) {
 	line := charts.NewLine()
 	line.SetGlobalOptions(charts.WithTitleOpts(opts.Title{Title: title}))
 
+	// Group the data into ranges
+	groupedData := groupGrades(data)
+
 	var labels []string
 	var values []opts.LineData
-	for label, value := range data {
+
+	// Sort the labels
+	for label := range groupedData {
 		labels = append(labels, label)
-		values = append(values, opts.LineData{Value: value})
 	}
+	sort.Strings(labels)
+
+	// Add sorted data to the chart
+	for _, label := range labels {
+		values = append(values, opts.LineData{Value: groupedData[label]})
+	}
+
 	line.SetXAxis(labels).AddSeries(title, values)
 
 	err := line.Render(w)
 	if err != nil {
 		http.Error(w, "Error rendering chart", http.StatusInternalServerError)
 	}
+}
+
+func groupGrades(data map[string]int) map[string]int {
+	grouped := make(map[string]int)
+	for grade, count := range data {
+		score, err := strconv.Atoi(grade)
+		if err != nil {
+			// If the grade is not a number, keep it as is
+			grouped[grade] += count
+		} else {
+			// Group scores into ranges of 10
+			rangeStart := (score / 10) * 10
+			rangeEnd := rangeStart + 9
+			rangeLabel := fmt.Sprintf("%d-%d", rangeStart, rangeEnd)
+			grouped[rangeLabel] += count
+		}
+	}
+	return grouped
 }
