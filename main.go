@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -19,18 +20,41 @@ type GradeData struct {
 	Rows    [][]string
 }
 
+func enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Set CORS headers
+		w.Header().Set("Access-Control-Allow-Origin", "*")                                // Allow all origins (replace "*" with your frontend's origin for more security, e.g., "http://localhost:3000")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE") // Allowed methods
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")     // Allowed headers
+
+		// If the request is an OPTIONS request, just return the headers and stop
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// Call the next handler
+		next.ServeHTTP(w, r)
+	})
+}
 func main() {
 	gradeData, err := readCSV("data.csv")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		rootHandler(w, r, gradeData)
 	})
 
-	log.Println("Server started at http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	mux.HandleFunc("/api/upload", uploadFileHandler)
+
+	handlerWithCORS := enableCORS(mux)
+
+	fmt.Println("Server listening on http://localhost:8080")
+	http.ListenAndServe(":8080", handlerWithCORS)
 }
 
 func readCSV(filename string) (GradeData, error) {
@@ -76,6 +100,37 @@ func rootHandler(w http.ResponseWriter, r *http.Request, data GradeData) {
 	}
 
 	renderChart(w, chartType, data, column)
+}
+
+func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		http.Error(w, "File too large.", http.StatusBadRequest)
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Error retrieving file.", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	dst, err := os.Create("./uploads/" + header.Filename)
+	if err != nil {
+		http.Error(w, "Unable to save file.", http.StatusInternalServerError)
+		return
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, file); err != nil {
+		http.Error(w, "Error saving file.", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `{"message": "File %s uploaded successfully"}`, header.Filename)
 }
 
 func displayOptions(w http.ResponseWriter, headers []string) {
