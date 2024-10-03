@@ -88,7 +88,6 @@ Here’s an example flow of how to use the application:
 
 ## Future Improvements
 
-- **Support for Excel files**: Add a functionality to handle `.xlsx` files directly instead of converting them to CSV first.
 - **Custom Charts**: Extend the application to allow for more advanced chart types like scatter plots and histograms.
 - **Improved UI**: Enhance the frontend with more styling and interactive chart elements.
 
