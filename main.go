@@ -1,55 +1,50 @@
 package main
 
 import (
+	"bytes"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
-	"os"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/go-echarts/go-echarts/v2/charts"
 	"github.com/go-echarts/go-echarts/v2/opts"
 )
 
 type GradeData struct {
-	Headers []string
-	Rows    [][]string
+	Headers []string   `json:"headers"`
+	Rows    [][]string `json:"rows"`
+}
+
+type ChartRequest struct {
+	ChartType string     `json:"chartType"`
+	Column    int        `json:"column"`
+	FileData  [][]string `json:"fileData"`
 }
 
 func enableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Set CORS headers
-		w.Header().Set("Access-Control-Allow-Origin", "*")                                // Allow all origins (replace "*" with your frontend's origin for more security, e.g., "http://localhost:3000")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE") // Allowed methods
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")     // Allowed headers
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
-		// If the request is an OPTIONS request, just return the headers and stop
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 
-		// Call the next handler
 		next.ServeHTTP(w, r)
 	})
 }
-func main() {
-	gradeData, err := readCSV("data.csv")
-	if err != nil {
-		log.Fatal(err)
-	}
 
+func main() {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		rootHandler(w, r, gradeData)
-	})
-
 	mux.HandleFunc("/api/upload", uploadFileHandler)
+	mux.HandleFunc("/api/chart", generateChartHandler)
 
 	handlerWithCORS := enableCORS(mux)
 
@@ -57,96 +52,80 @@ func main() {
 	http.ListenAndServe(":8080", handlerWithCORS)
 }
 
-func readCSV(filename string) (GradeData, error) {
-	file, err := os.Open(filename)
+func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
-		return GradeData{}, err
+		http.Error(w, "File too large", http.StatusBadRequest)
+		return
+	}
+
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Error retrieving file", http.StatusBadRequest)
+		return
 	}
 	defer file.Close()
 
 	reader := csv.NewReader(file)
 	records, err := reader.ReadAll()
 	if err != nil {
-		return GradeData{}, err
+		http.Error(w, "Error reading CSV file", http.StatusBadRequest)
+		return
 	}
 
 	if len(records) < 2 {
-		return GradeData{}, fmt.Errorf("CSV file is empty or has insufficient data")
-	}
-
-	return GradeData{
-		Headers: records[0],
-		Rows:    records[1:],
-	}, nil
-}
-
-func rootHandler(w http.ResponseWriter, r *http.Request, data GradeData) {
-	if r.URL.Path == "/" {
-		displayOptions(w, data.Headers)
+		http.Error(w, "CSV file is empty or has insufficient data", http.StatusBadRequest)
 		return
 	}
 
-	parts := strings.Split(r.URL.Path, "/")
-	if len(parts) != 3 {
-		http.NotFound(w, r)
-		return
-	}
+	headers := records[0]
 
-	chartType := parts[1]
-	column, err := strconv.Atoi(parts[2])
-	if err != nil || column < 0 || column >= len(data.Headers) {
-		http.Error(w, "Invalid column selection", http.StatusBadRequest)
-		return
-	}
-
-	renderChart(w, chartType, data, column)
-}
-
-func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseMultipartForm(10 << 20)
-	if err != nil {
-		http.Error(w, "File too large.", http.StatusBadRequest)
-		return
-	}
-
-	file, header, err := r.FormFile("file")
-	if err != nil {
-		http.Error(w, "Error retrieving file.", http.StatusBadRequest)
-		return
-	}
-	defer file.Close()
-
-	dst, err := os.Create("./uploads/" + header.Filename)
-	if err != nil {
-		http.Error(w, "Unable to save file.", http.StatusInternalServerError)
-		return
-	}
-	defer dst.Close()
-
-	if _, err := io.Copy(dst, file); err != nil {
-		http.Error(w, "Error saving file.", http.StatusInternalServerError)
-		return
+	response := map[string]interface{}{
+		"headers": headers,
+		"message": "File uploaded successfully",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"message": "File %s uploaded successfully"}`, header.Filename)
+	json.NewEncoder(w).Encode(response)
 }
 
-func displayOptions(w http.ResponseWriter, headers []string) {
-	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprintf(w, "<h1>Select a column to visualize:</h1>")
-	for i, header := range headers {
-		fmt.Fprintf(w, "<p>%s:</p>", header)
-		fmt.Fprintf(w, "<ul>")
-		fmt.Fprintf(w, "<li><a href='/pie/%d'>Pie Chart</a></li>", i)
-		fmt.Fprintf(w, "<li><a href='/bar/%d'>Bar Chart</a></li>", i)
-		fmt.Fprintf(w, "<li><a href='/line/%d'>Line Chart</a></li>", i)
-		fmt.Fprintf(w, "</ul>")
+func generateChartHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
+
+	var request ChartRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	data := GradeData{
+		Headers: request.FileData[0],
+		Rows:    request.FileData[1:],
+	}
+
+	var buf bytes.Buffer
+	if err := generateChart(&buf, request.ChartType, data, request.Column); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"html": buf.String(),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
-func renderChart(w http.ResponseWriter, chartType string, data GradeData, column int) {
+func generateChart(w io.Writer, chartType string, data GradeData, column int) error {
 	counts := make(map[string]int)
 	for _, row := range data.Rows {
 		if column < len(row) {
@@ -158,25 +137,22 @@ func renderChart(w http.ResponseWriter, chartType string, data GradeData, column
 
 	switch chartType {
 	case "pie":
-		createPieChart(counts, title, w)
+		return createPieChart(w, counts, title)
 	case "bar":
-		createBarChart(counts, title, w)
+		return createBarChart(w, counts, title)
 	case "line":
-		createLineChart(counts, title, w)
+		return createLineChart(w, counts, title)
 	default:
-		http.Error(w, "Invalid chart type", http.StatusBadRequest)
-		return
+		return fmt.Errorf("invalid chart type")
 	}
 }
 
-func createPieChart(data map[string]int, title string, w http.ResponseWriter) {
+func createPieChart(w io.Writer, data map[string]int, title string) error {
 	pie := charts.NewPie()
 	pie.SetGlobalOptions(charts.WithTitleOpts(opts.Title{Title: title}))
 
-	// Group the data
 	groupedData := groupGrades(data)
 
-	// Sort the labels
 	var labels []string
 	for label := range groupedData {
 		labels = append(labels, label)
@@ -189,68 +165,62 @@ func createPieChart(data map[string]int, title string, w http.ResponseWriter) {
 	}
 	pie.AddSeries(title, items)
 
-	err := pie.Render(w)
-	if err != nil {
-		http.Error(w, "Error rendering chart", http.StatusInternalServerError)
+	if err := pie.Render(w); err != nil {
+		return err
 	}
+	return nil
 }
 
-func createBarChart(data map[string]int, title string, w http.ResponseWriter) {
+func createBarChart(w io.Writer, data map[string]int, title string) error {
 	bar := charts.NewBar()
 	bar.SetGlobalOptions(charts.WithTitleOpts(opts.Title{Title: title}))
 
-	// Group the data into ranges
 	groupedData := groupGrades(data)
 
 	var labels []string
 	var values []opts.BarData
 
-	// Sort the labels
 	for label := range groupedData {
 		labels = append(labels, label)
 	}
 	sort.Strings(labels)
 
-	// Add sorted data to the chart
 	for _, label := range labels {
 		values = append(values, opts.BarData{Value: groupedData[label]})
 	}
 
 	bar.SetXAxis(labels).AddSeries(title, values)
 
-	err := bar.Render(w)
-	if err != nil {
-		http.Error(w, "Error rendering chart", http.StatusInternalServerError)
+	if err := bar.Render(w); err != nil {
+		return err
 	}
+	return nil
 }
 
-func createLineChart(data map[string]int, title string, w http.ResponseWriter) {
+func createLineChart(w io.Writer, data map[string]int, title string) error {
 	line := charts.NewLine()
 	line.SetGlobalOptions(charts.WithTitleOpts(opts.Title{Title: title}))
 
-	// Group the data into ranges
 	groupedData := groupGrades(data)
 
 	var labels []string
 	var values []opts.LineData
 
-	// Sort the labels
 	for label := range groupedData {
 		labels = append(labels, label)
 	}
 	sort.Strings(labels)
 
-	// Add sorted data to the chart
 	for _, label := range labels {
 		values = append(values, opts.LineData{Value: groupedData[label]})
 	}
 
 	line.SetXAxis(labels).AddSeries(title, values)
 
-	err := line.Render(w)
-	if err != nil {
-		http.Error(w, "Error rendering chart", http.StatusInternalServerError)
+	if err := line.Render(w); err != nil {
+		return err
 	}
+	return nil
 }
 
 func groupGrades(data map[string]int) map[string]int {
