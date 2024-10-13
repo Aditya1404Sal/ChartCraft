@@ -9,20 +9,21 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/go-echarts/go-echarts/v2/charts"
 	"github.com/go-echarts/go-echarts/v2/opts"
 )
 
 type GradeData struct {
-	Headers []string   `json:"headers"`
-	Rows    [][]string `json:"rows"`
+	Headers []string
+	Rows    [][]string
 }
 
 type ChartRequest struct {
-	ChartType string     `json:"chartType"`
-	Column    int        `json:"column"`
-	FileData  [][]string `json:"fileData"`
+	ChartType string
+	Column    int
+	FileData  [][]string
 }
 
 func enableCORS(next http.Handler) http.Handler {
@@ -133,7 +134,9 @@ func generateChart(w io.Writer, chartType string, data GradeData, column int) er
 		}
 	}
 
-	title := data.Headers[column] + " Distribution"
+	x := strings.Trim(data.Headers[column], "\"")
+	y := strings.ToUpper(string(x[0])) + x[1:]
+	title := y + " Distribution"
 
 	switch chartType {
 	case "pie":
@@ -149,7 +152,17 @@ func generateChart(w io.Writer, chartType string, data GradeData, column int) er
 
 func createPieChart(w io.Writer, data map[string]int, title string) error {
 	pie := charts.NewPie()
-	pie.SetGlobalOptions(charts.WithTitleOpts(opts.Title{Title: title}))
+
+	pie.SetGlobalOptions(
+		charts.WithTitleOpts(opts.Title{
+			Title: title,
+		}),
+		charts.WithLegendOpts(opts.Legend{
+			Orient: "vertical",
+			Left:   "left",
+			Top:    "10%",
+		}),
+	)
 
 	groupedData := groupGrades(data)
 
@@ -165,10 +178,7 @@ func createPieChart(w io.Writer, data map[string]int, title string) error {
 	}
 	pie.AddSeries(title, items)
 
-	if err := pie.Render(w); err != nil {
-		return err
-	}
-	return nil
+	return pie.Render(w)
 }
 
 func createBarChart(w io.Writer, data map[string]int, title string) error {
@@ -178,23 +188,19 @@ func createBarChart(w io.Writer, data map[string]int, title string) error {
 	groupedData := groupGrades(data)
 
 	var labels []string
-	var values []opts.BarData
-
 	for label := range groupedData {
 		labels = append(labels, label)
 	}
 	sort.Strings(labels)
 
+	var values []opts.BarData
 	for _, label := range labels {
 		values = append(values, opts.BarData{Value: groupedData[label]})
 	}
 
 	bar.SetXAxis(labels).AddSeries(title, values)
 
-	if err := bar.Render(w); err != nil {
-		return err
-	}
-	return nil
+	return bar.Render(w)
 }
 
 func createLineChart(w io.Writer, data map[string]int, title string) error {
@@ -204,39 +210,41 @@ func createLineChart(w io.Writer, data map[string]int, title string) error {
 	groupedData := groupGrades(data)
 
 	var labels []string
-	var values []opts.LineData
-
 	for label := range groupedData {
 		labels = append(labels, label)
 	}
 	sort.Strings(labels)
 
+	var values []opts.LineData
 	for _, label := range labels {
 		values = append(values, opts.LineData{Value: groupedData[label]})
 	}
 
 	line.SetXAxis(labels).AddSeries(title, values)
 
-	if err := line.Render(w); err != nil {
-		return err
-	}
-	return nil
+	return line.Render(w)
 }
 
 func groupGrades(data map[string]int) map[string]int {
 	grouped := make(map[string]int)
 	for grade, count := range data {
+		grade = strings.TrimSpace(grade)
+		grade = strings.Trim(grade, "\"")
+
+		if grade == "" {
+			continue
+		}
+
 		score, err := strconv.Atoi(grade)
 		if err != nil {
-			// If the grade is not a number, keep it as is
 			grouped[grade] += count
-		} else {
-			// Group scores into ranges of 10
-			rangeStart := (score / 10) * 10
-			rangeEnd := rangeStart + 9
-			rangeLabel := fmt.Sprintf("%d-%d", rangeStart, rangeEnd)
-			grouped[rangeLabel] += count
+			continue
 		}
+
+		rangeStart := (score / 10) * 10
+		rangeEnd := rangeStart + 9
+		rangeLabel := fmt.Sprintf("%d-%d", rangeStart, rangeEnd)
+		grouped[rangeLabel] += count
 	}
 	return grouped
 }
