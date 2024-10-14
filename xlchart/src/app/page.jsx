@@ -40,7 +40,7 @@ export default function DataVisualizer() {
     } else {
       setUploadStatus({
         type: 'error',
-        message: 'Please upload only CSV files.'
+        message: 'Please upload only CSV or Excel files.'
       });
     }
   };
@@ -53,13 +53,14 @@ export default function DataVisualizer() {
     } else {
       setUploadStatus({
         type: 'error',
-        message: 'Please upload only CSV files.'
+        message: 'Please upload only CSV or Excel files.'
       });
     }
   };
 
   const isValidFileType = (file) => {
-    return file && file.name.toLowerCase().endsWith('.csv');
+    const validExtensions = ['.csv', '.xlsx', '.xls'];
+    return file && validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
   };
 
   const handleFileUpload = async (e) => {
@@ -78,7 +79,6 @@ export default function DataVisualizer() {
     try {
       setUploadStatus({ type: 'progress', message: 'Uploading...' });
 
-      // Change the endpoint to match your server URL and path
       const response = await fetch('http://localhost:8080/api/upload', {
         method: 'POST',
         body: formData
@@ -91,21 +91,27 @@ export default function DataVisualizer() {
       const data = await response.json();
       console.log('Response from server:', data);
 
-      // Make sure 'headers' are part of the response
       if (!data.headers) {
         throw new Error('No headers returned from server');
       }
 
       setHeaders(data.headers);
 
-      // Read the file content as well for later chart use
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target.result;
-        const rows = text.split('\n').map((row) => row.split(','));
-        setFileData(rows);
-      };
-      reader.readAsText(file);
+      // For CSV files, read the content client-side
+      if (file.name.toLowerCase().endsWith('.csv')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const text = e.target.result;
+          const rows = text.split('\n').map((row) => row.split(','));
+          setFileData(rows);
+        };
+        reader.readAsText(file);
+      } else {
+        // For Excel files, we'll need to handle this differently
+        // You might want to send another request to get the full data
+        // or handle it in a way that fits your application's needs
+        setFileData([]);
+      }
 
       setUploadStatus({
         type: 'success',
@@ -153,7 +159,6 @@ export default function DataVisualizer() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      {/* Upload Section */}
       <form onSubmit={handleFileUpload} className="space-y-4">
         <div
           onDragOver={onDragOver}
@@ -168,7 +173,7 @@ export default function DataVisualizer() {
           <input
             id="file-input"
             type="file"
-            accept=".csv"
+            accept=".csv,.xlsx,.xls"
             onChange={handleFileChange}
             className="hidden"
           />
@@ -180,7 +185,7 @@ export default function DataVisualizer() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
             <span className="text-sm font-medium text-gray-600">
-              Drop your CSV file here or click to browse
+              Drop your CSV or Excel file here or click to browse
             </span>
           </label>
         </div>
@@ -281,16 +286,17 @@ export default function DataVisualizer() {
           <button
             type="button"
             onClick={generateChart}
-            className="w-full mt-2 bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+            className="w-full mt-4 bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
           >
             Generate Chart
           </button>
 
-          
+          {chartHtml && (
             <iframe
-            srcDoc={chartHtml}
-            className="mt-6 w-full h-[600px] border rounded-lg"
-          />
+              srcDoc={chartHtml}
+              className="mt-6 w-full h-[600px] border rounded-lg"
+            />
+          )}
         </div>
       )}
     </div>

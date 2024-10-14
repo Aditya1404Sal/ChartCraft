@@ -6,13 +6,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/go-echarts/go-echarts/v2/charts"
 	"github.com/go-echarts/go-echarts/v2/opts"
+	"github.com/xuri/excelize/v2"
 )
 
 type GradeData struct {
@@ -65,22 +68,34 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, _, err := r.FormFile("file")
+	file, header, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "Error retrieving file", http.StatusBadRequest)
 		return
 	}
 	defer file.Close()
 
-	reader := csv.NewReader(file)
-	records, err := reader.ReadAll()
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+
+	var records [][]string
+
+	switch ext {
+	case ".csv":
+		records, err = readCSV(file)
+	case ".xlsx":
+		records, err = readExcel(file)
+	default:
+		http.Error(w, "Unsupported file type", http.StatusBadRequest)
+		return
+	}
+
 	if err != nil {
-		http.Error(w, "Error reading CSV file", http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("Error reading file: %v", err), http.StatusBadRequest)
 		return
 	}
 
 	if len(records) < 2 {
-		http.Error(w, "CSV file is empty or has insufficient data", http.StatusBadRequest)
+		http.Error(w, "File is empty or has insufficient data", http.StatusBadRequest)
 		return
 	}
 
@@ -93,6 +108,31 @@ func uploadFileHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+func readCSV(file multipart.File) ([][]string, error) {
+	reader := csv.NewReader(file)
+	return reader.ReadAll()
+}
+
+func readExcel(file multipart.File) ([][]string, error) {
+	f, err := excelize.OpenReader(file)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	sheets := f.GetSheetList()
+	if len(sheets) == 0 {
+		return nil, fmt.Errorf("no sheets found in Excel file")
+	}
+
+	rows, err := f.GetRows(sheets[0])
+	if err != nil {
+		return nil, err
+	}
+
+	return rows, nil
 }
 
 func generateChartHandler(w http.ResponseWriter, r *http.Request) {
