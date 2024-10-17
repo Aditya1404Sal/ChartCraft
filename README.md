@@ -1,6 +1,6 @@
-# XLtoChart
+# ChartCraft
 
-XLtoChart is a Go-based web application that allows users to upload CSV files, process the data, and dynamically generate different types of charts (Pie, Bar, Line) to visualize the data. It uses the **go-echarts/v2** library for chart rendering and provides a simple API for file upload and chart generation.
+ChartCraft is a Go-based web application that allows users to upload CSV files, process the data, and dynamically generate different types of charts (Pie, Bar, Line) to visualize the data. It uses the **go-echarts/v2** library for chart rendering and provides a simple API for file upload and chart generation.
 
 ## Features
 
@@ -25,8 +25,8 @@ XLtoChart is a Go-based web application that allows users to upload CSV files, p
 
 1. **Clone the repository**:
     ```bash
-    git clone https://github.com/yourusername/xltochart.git
-    cd xltochart
+    git clone https://github.com/yourusername/ChartCraft.git
+    cd ChartCraft
     ```
 
 2. **Install Go dependencies**:

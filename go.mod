@@ -1,4 +1,4 @@
-module github.com/Aditya1404Sal/XLtoChart
+module github.com/Aditya1404Sal/ChartCraft
 
 go 1.22.0
 
