@@ -1,22 +1,25 @@
 # XLtoChart
 
-XLtoChart is a simple Go-based application that reads data from a CSV file, processes it, and dynamically generates different types of charts (Pie, Bar, Line) to visualize the data. It uses the **go-echarts/v2** library for chart rendering.
+XLtoChart is a Go-based web application that allows users to upload CSV files, process the data, and dynamically generate different types of charts (Pie, Bar, Line) to visualize the data. It uses the **go-echarts/v2** library for chart rendering and provides a simple API for file upload and chart generation.
 
 ## Features
 
-- **CSV Parsing**: Reads data from a CSV file and allows users to select specific columns to visualize.
-- **Chart Generation**: Supports Pie, Bar, and Line charts.
-- **Dynamic Selection**: Users can select a column to generate a chart dynamically via the web interface.
-- **Grade Grouping**: Automatically groups grades into ranges when creating the chart.
+- **CSV File Upload**: Allows users to upload CSV files through a web interface.
+- **Dynamic Chart Generation**: Supports Pie, Bar, and Line charts based on user selection.
+- **Column Selection**: Users can select specific columns from the uploaded CSV to visualize.
+- **Grade Grouping**: Automatically groups numeric grades into ranges when creating charts.
+- **CORS Support**: Enables cross-origin resource sharing for API endpoints.
 
 ## Tech Stack
 
 - **Backend**: Go
-  - CSV parsing with Go’s `encoding/csv` package.
-  - Chart rendering using the **go-echarts/v2** library.
-- **Frontend**: HTML generated dynamically by Go’s template engine.
+  - HTTP server using Go's `net/http` package
+  - CSV parsing with Go's `encoding/csv` package
+  - JSON encoding/decoding with Go's `encoding/json` package
+  - Chart rendering using the **go-echarts/v2** library
+- **Frontend**: Not included in this backend code, but the API supports a separate frontend application
 - **Libraries**: 
-  - [go-echarts/v2](https://github.com/go-echarts/go-echarts) for rendering charts.
+  - [go-echarts/v2](https://github.com/go-echarts/go-echarts) for rendering charts
 
 ## Setup and Installation
 
@@ -31,65 +34,93 @@ XLtoChart is a simple Go-based application that reads data from a CSV file, proc
     go mod tidy
     ```
 
-3. **Prepare the CSV file**:
-    - Create a `data.csv` file in the root directory. This file should have headers and data rows. For example:
-    
-      ```csv
-      Name,Math,English,Science
-      Alice,95,88,92
-      Bob,75,80,78
-      Charlie,85,82,89
-      ```
-
-4. **Run the Go application**:
+3. **Run the Go application**:
     ```bash
     go run main.go
     ```
 
-5. **Access the application**:
-    Open a web browser and navigate to `http://localhost:8080`. You’ll see a page where you can select a column and choose a chart type (Pie, Bar, Line) to visualize the data.
+4. **Access the application**:
+    The server will start on `http://localhost:8080`. You can now use the API endpoints to interact with the application.
+
+## API Endpoints
+
+1. **File Upload**
+   - URL: `/api/upload`
+   - Method: POST
+   - Content-Type: multipart/form-data
+   - Body: CSV file (key: "file")
+   - Response: JSON containing headers of the CSV file
+
+2. **Chart Generation**
+   - URL: `/api/chart`
+   - Method: POST
+   - Content-Type: application/json
+   - Body: 
+     ```json
+     {
+       "ChartType": "pie|bar|line",
+       "Column": 0,
+       "FileData": [["header1", "header2"], ["data1", "data2"], ...]
+     }
+     ```
+   - Response: JSON containing HTML of the generated chart
 
 ## Code Structure
 
-- `main.go`: Contains the main logic for reading CSV data, handling requests, and rendering charts.
-- `data.csv`: The data file used for visualization (make sure this is present in the root folder).
-- `charts/`: Holds the go-echarts configuration for creating different types of charts (Pie, Bar, Line).
+- `main.go`: Contains the main logic for handling HTTP requests, file uploads, and chart generation.
+- `enableCORS()`: Middleware function to enable CORS for all routes.
+- `uploadFileHandler()`: Handles CSV file uploads and returns the headers.
+- `generateChartHandler()`: Processes requests for chart generation.
+- `generateChart()`: Creates the specified chart type using the provided data.
+- `createPieChart()`, `createBarChart()`, `createLineChart()`: Functions to generate specific chart types.
+- `groupGrades()`: Helper function to group numeric grades into ranges.
 
 ## How It Works
 
-1. **CSV Parsing**: 
-    - Reads the CSV file and stores the headers and rows of data in memory.
-2. **Frontend**:
-    - Presents a page listing each column of the CSV file as options to visualize.
-    - Users can click on options to visualize data with different charts (Pie, Bar, or Line).
-3. **Backend**:
-    - Dynamically generates the selected chart based on the column and chart type.
-4. **Chart Rendering**:
-    - Uses the go-echarts library to create and render the charts, which are displayed in the browser.
+1. **File Upload**: 
+   - Users upload a CSV file through the `/api/upload` endpoint.
+   - The server parses the CSV and returns the headers to the client.
 
-## Example
+2. **Chart Generation**:
+   - Clients send a POST request to `/api/chart` with the desired chart type, column index, and file data.
+   - The server generates the specified chart using go-echarts and returns the HTML representation.
 
-Here’s an example flow of how to use the application:
+3. **Data Processing**:
+   - Numeric grades are automatically grouped into ranges (e.g., 80-89, 90-99) for better visualization.
+   - Non-numeric data is treated as categories.
 
-1. Upload a CSV file like this:
-    ```csv
-    Name,Math,Science,English
-    Alice,85,92,88
-    Bob,78,75,80
-    Charlie,89,85,82
-    ```
-2. Run the Go application.
-3. Visit `http://localhost:8080` and select the column "Math" to visualize with a Pie Chart.
+## Example Usage
+
+1. Upload a CSV file:
+   ```
+   POST /api/upload
+   Content-Type: multipart/form-data
+   Body: file=@grades.csv
+   ```
+
+2. Generate a chart:
+   ```
+   POST /api/chart
+   Content-Type: application/json
+   Body: 
+   {
+     "ChartType": "pie",
+     "Column": 1,
+     "FileData": [["Name", "Math", "Science"], ["Alice", "85", "92"], ["Bob", "78", "75"]]
+   }
+   ```
 
 ## Dependencies
 
-- Go 1.19 or higher
-- **go-echarts/v2** library
+- Go 1.20 or higher
+- github.com/go-echarts/go-echarts/v2
 
 ## Future Improvements
 
-- **Custom Charts**: Extend the application to allow for more advanced chart types like scatter plots and histograms.
-- **Improved UI**: Enhance the frontend with more styling and interactive chart elements.
-
+- Add authentication and authorization for API endpoints.
+- Implement data caching to improve performance for large datasets.
+- Add more chart types and customization options.
+- Create a frontend application to interact with the API.
+- Implement error logging and monitoring.
 
 Happy coding!
