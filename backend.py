@@ -112,5 +112,5 @@ def group_grades(data):
     return grouped
 
 if __name__ == '__main__':
-    print("Server listening on http://localhost:5000")
-    app.run(port=5000)
+    print("Server listening on http://localhost:80800")
+    app.run(port=8080)
