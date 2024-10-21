@@ -7,7 +7,10 @@ export default function DataVisualizer() {
   const [uploadStatus, setUploadStatus] = useState({ type: '', message: '' });
   const [headers, setHeaders] = useState([]);
   const [fileData, setFileData] = useState([]);
-  const [selectedHeader, setSelectedHeader] = useState(null);
+  const [selectedXHeader, setSelectedXHeader] = useState(null);
+  const [selectedYHeader, setSelectedYHeader] = useState(null);
+  const [selectedFilterHeader, setSelectedFilterHeader] = useState(null);
+  const [filterValue, setFilterValue] = useState('');
   const [chartType, setChartType] = useState('bar');
   const [chartHtml, setChartHtml] = useState('');
 
@@ -120,10 +123,24 @@ export default function DataVisualizer() {
   };
 
   const generateChart = async () => {
-    if (!selectedHeader || !chartType || fileData.length === 0) return;
-
-    const headerIndex = headers.indexOf(selectedHeader);
-
+    if (
+      !selectedXHeader ||
+      !selectedYHeader ||
+      !selectedFilterHeader ||
+      !filterValue ||
+      !chartType ||
+      fileData.length === 0
+    )
+      return;
+  
+    const xColumnIndex = headers.indexOf(selectedXHeader);
+    const yColumnIndex = headers.indexOf(selectedYHeader);
+    const filterColumnIndex = headers.indexOf(selectedFilterHeader);
+  
+    const filteredData = fileData.filter((row) => {
+      return row[filterColumnIndex]?.trim() === filterValue;
+    });
+  
     try {
       const response = await fetch('http://localhost:8080/api/chart', {
         method: 'POST',
@@ -132,15 +149,19 @@ export default function DataVisualizer() {
         },
         body: JSON.stringify({
           chartType,
-          column: headerIndex,
-          fileData
+          xColumn: xColumnIndex,
+          yColumn: yColumnIndex,
+          filterColumn: filterColumnIndex,
+          filterValue,
+          fileData: [headers, ...filteredData]
         })
       });
-
+  
       if (!response.ok) {
-        throw new Error('Failed to generate chart');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate chart');
       }
-
+  
       const data = await response.json();
       setChartHtml(data.html);
     } catch (error) {
@@ -258,18 +279,18 @@ export default function DataVisualizer() {
         {headers.length > 0 && (
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Generate Your Chart</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label htmlFor="data-column" className="block text-sm font-medium text-gray-700 mb-1">
-                  Select Data Column
+                <label htmlFor="x-column" className="block text-sm font-medium text-gray-700 mb-1">
+                  X-Axis Column
                 </label>
                 <select
-                  id="data-column"
+                  id="x-column"
                   className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                  onChange={(e) => setSelectedHeader(e.target.value)}
-                  value={selectedHeader}
+                  onChange={(e) => setSelectedXHeader(e.target.value)}
+                  value={selectedXHeader}
                 >
-                  <option value="" disabled>Select a column</option>
+                  <option value="" disabled>Select an X-axis column</option>
                   {headers.map((header, index) => (
                     <option key={index} value={header}>
                       {header}
@@ -279,7 +300,58 @@ export default function DataVisualizer() {
               </div>
 
               <div>
-                <label htmlFor="chart-type" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="y-column" className="block text-sm font-medium text-gray-700 mb-1">
+                  Y-Axis Column
+                </label>
+                <select
+                  id="y-column"
+                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                  onChange={(e) => setSelectedYHeader(e.target.value)}
+                  value={selectedYHeader}
+                >
+                  <option value="" disabled>Select a Y-axis column</option>
+                  {headers.map((header, index) => (
+                    <option key={index} value={header}>
+                      {header}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="filter-column" className="block text-sm font-medium text-gray-700 mb-1">
+                  Filter Column
+                </label>
+                <select
+                  id="filter-column"
+                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                  onChange={(e) => setSelectedFilterHeader(e.target.value)}
+                  value={selectedFilterHeader}
+                >
+                  <option value="" disabled>Select a filter column</option>
+                  {headers.map((header, index) => (
+                    <option key={index} value={header}>
+                      {header}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="filter-value" className="block text-sm font-medium text-gray-700 mb-1">
+                  Filter Value
+                </label>
+                <input
+                  id="filter-value"
+                  type="text"
+                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                  value={filterValue}
+                  onChange={(e) => setFilterValue(e.target.value)}
+                />
+              </div>
+
+              <div>
+              <label htmlFor="chart-type" className="block text-sm font-medium text-gray-700 mb-1">
                   Chart Type
                 </label>
                 <select
