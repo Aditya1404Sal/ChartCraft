@@ -13,6 +13,9 @@ export default function DataVisualizer() {
   const [filterValue, setFilterValue] = useState('');
   const [chartType, setChartType] = useState('bar');
   const [chartHtml, setChartHtml] = useState('');
+  const [uniqueFilterValues, setUniqueFilterValues] = useState([]);
+  const [filterSearchValue, setFilterSearchValue] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (uploadStatus.type === 'success' || uploadStatus.type === 'error') {
@@ -22,6 +25,14 @@ export default function DataVisualizer() {
       return () => clearTimeout(timer);
     }
   }, [uploadStatus]);
+
+  useEffect(() => {
+    if (selectedFilterHeader && fileData.length > 0) {
+      const filterColumnIndex = headers.indexOf(selectedFilterHeader);
+      const unique = [...new Set(fileData.map(row => row[filterColumnIndex]?.trim()))].filter(Boolean);
+      setUniqueFilterValues(unique);
+    }
+  }, [selectedFilterHeader, fileData, headers]);
 
   const onDragOver = (e) => {
     e.preventDefault();
@@ -280,6 +291,24 @@ export default function DataVisualizer() {
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Generate Your Chart</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+            <div>
+              <label htmlFor="chart-type" className="block text-sm font-medium text-gray-700 mb-1">
+                  Chart Type
+                </label>
+                <select
+                  id="chart-type"
+                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                  onChange={(e) => setChartType(e.target.value)}
+                  value={chartType}
+                >
+                  <option value="bar">Bar Chart</option>
+                  <option value="pie">Pie Chart</option>
+                  <option value="line">Line Chart</option>
+                  <option value="scatter">Scatter Chart</option>
+                </select>
+              </div>
+
               <div>
                 <label htmlFor="x-column" className="block text-sm font-medium text-gray-700 mb-1">
                   X-Axis Column
@@ -337,34 +366,45 @@ export default function DataVisualizer() {
                 </select>
               </div>
 
-              <div>
-                <label htmlFor="filter-value" className="block text-sm font-medium text-gray-700 mb-1">
-                  Filter Value
-                </label>
-                <input
-                  id="filter-value"
-                  type="text"
-                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                  value={filterValue}
-                  onChange={(e) => setFilterValue(e.target.value)}
-                />
-              </div>
-
-              <div>
-              <label htmlFor="chart-type" className="block text-sm font-medium text-gray-700 mb-1">
-                  Chart Type
-                </label>
-                <select
-                  id="chart-type"
-                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-                  onChange={(e) => setChartType(e.target.value)}
-                  value={chartType}
-                >
-                  <option value="bar">Bar Chart</option>
-                  <option value="pie">Pie Chart</option>
-                  <option value="line">Line Chart</option>
-                </select>
-              </div>
+              <div className="relative">
+  <label htmlFor="filter-value" className="block text-sm font-medium text-gray-700 mb-1">
+    Filter Value
+  </label>
+  <input
+    type="text"
+    className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+    placeholder="Search filter value..."
+    value={filterValue || filterSearchValue}
+    onChange={(e) => {
+      setFilterSearchValue(e.target.value);
+      setFilterValue('');
+      setIsDropdownOpen(true);
+    }}
+    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+  />
+  {isDropdownOpen && (
+    <div 
+      className="absolute z-10 w-full mt-1 bg-white shadow-lg max-h-60 rounded-md py-1 text-base overflow-auto"
+      onBlur={() => setIsDropdownOpen(false)}
+    >
+      {uniqueFilterValues
+        .filter(value => value.toLowerCase().includes(filterSearchValue.toLowerCase()))
+        .map((value, index) => (
+          <div
+            key={index}
+            className="cursor-pointer hover:bg-gray-100 px-3 py-2"
+            onClick={() => {
+              setFilterValue(value);
+              setFilterSearchValue('');
+              setIsDropdownOpen(false);
+            }}
+          >
+            {value}
+          </div>
+        ))}
+    </div>
+  )}
+</div>
             </div>
 
             <button
