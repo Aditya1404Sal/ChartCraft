@@ -10,10 +10,35 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
+VIBGYOR_COLORS = ['violet', 'indigo', 'blue', 'green', 'yellow', 'orange', 'red']
+
 class GradeData:
     def __init__(self, headers, rows):
         self.headers = headers
         self.rows = rows
+
+def normalize_value(value):
+    """
+    Convert values with 'M' or 'B' suffixes into numeric format and return the suffix.
+    Examples:
+        '234M' -> (234e6, 'M')
+        '1.5B' -> (1.5e9, 'B')
+    """
+    value = str(value)
+    value = value.strip()
+    suffix = ''
+    if value.endswith('M'):
+        numeric_value = float(value[:-1]) * 1e6
+        suffix = 'M'
+    elif value.endswith('B'):
+        numeric_value = float(value[:-1]) * 1e9
+        suffix = 'B'
+    elif value.endswith('m'):  # Meters or similar metric units
+        numeric_value = float(value[:-1])
+        suffix = 'm'
+    else:  # Assume plain numeric value if no recognized suffix
+        numeric_value = float(value)  # Assume plain numeric value if no suffix
+    return numeric_value, suffix
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
@@ -67,31 +92,41 @@ def generate_chart_plt(chart_type, data, x_column, y_column, filter_column, filt
 
     x_values = [row[x_column] for row in filtered_rows]
     
-    try:
-        # Convert revenue values to float after removing commas and converting to numeric format
-        y_values = [float(row[y_column].replace(',', '').replace('"', '').strip()) for row in filtered_rows]
-    except ValueError as ve:
-        raise ValueError("Non-numeric value found in Y column") from ve
+    y_values = []
+    y_suffix = ""
+    for row in filtered_rows:
+        try:
+            value, suffix = normalize_value(row[y_column].replace(',', '').replace('"', '').strip())
+            y_values.append(value)
+            y_suffix = suffix  # Assume all values in the column have the same suffix
+        except ValueError as ve:
+            raise ValueError("Non-numeric value found in Y column") from ve
 
     plt.figure(figsize=(10, 6))
     plt.title(f"{data.headers[y_column]} vs {data.headers[x_column]}")
 
     if chart_type == "pie":
-        plt.pie(y_values, labels=x_values, autopct='%1.1f%%', colors=VIBGYOR_COLORS, startangle=90)
+        plt.pie(y_values, labels=[f"{x} ({y_suffix})" for x in x_values], autopct='%1.1f%%', colors=VIBGYOR_COLORS, startangle=90)
         plt.axis('equal')
         plt.legend(x_values, loc="upper left", bbox_to_anchor=(1, 1))
         
     elif chart_type == "bar":
-        plt.bar(x_values, y_values, color=VIBGYOR_COLORS)
-        plt.xticks(rotation=90)
+        plt.bar(x_values, y_values, color=VIBGYOR_COLORS[0])
+        plt.xticks(rotation=45)
         plt.xlabel(data.headers[x_column])
-        plt.ylabel(data.headers[y_column])
+        plt.ylabel(f"{data.headers[y_column]} ({y_suffix})")
         
     elif chart_type == "line":
         plt.plot(x_values, y_values, marker='o', color=VIBGYOR_COLORS[0])
-        plt.xticks(rotation=90)
+        plt.xticks(rotation=45)
         plt.xlabel(data.headers[x_column])
-        plt.ylabel(data.headers[y_column])
+        plt.ylabel(f"{data.headers[y_column]} ({y_suffix})")
+
+    elif chart_type == "scatter":
+        plt.scatter(x_values, y_values, color=VIBGYOR_COLORS[0])
+        plt.xlabel(data.headers[x_column])
+        plt.ylabel(f"{data.headers[y_column]} ({y_suffix})")
+        plt.xticks(rotation=45)
         
     else:
         raise ValueError("Invalid chart type")
@@ -107,8 +142,6 @@ def generate_chart_plt(chart_type, data, x_column, y_column, filter_column, filt
     svg_string = re.sub(r'stroke="[^"]*?"', '', svg_string)
 
     return svg_string
-
-VIBGYOR_COLORS = ['violet', 'indigo', 'blue', 'green', 'yellow', 'orange', 'red']
 
 if __name__ == '__main__':
     print("Server listening on http://localhost:8080")
