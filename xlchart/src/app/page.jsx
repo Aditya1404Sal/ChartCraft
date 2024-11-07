@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import Papa from 'papaparse';
 
 export default function DataVisualizer() {
   const [file, setFile] = useState(null);
@@ -116,8 +117,11 @@ export default function DataVisualizer() {
       const reader = new FileReader();
       reader.onload = (e) => {
         const text = e.target.result;
-        const rows = text.split('\n').map((row) => row.split(','));
-        setFileData(rows);
+        const result = Papa.parse(text, {
+          header: false,
+          skipEmptyLines: true
+        });
+        setFileData(result.data);
       };
       reader.readAsText(file);
 
@@ -143,15 +147,15 @@ export default function DataVisualizer() {
       fileData.length === 0
     )
       return;
-  
+
     const xColumnIndex = headers.indexOf(selectedXHeader);
     const yColumnIndex = headers.indexOf(selectedYHeader);
     const filterColumnIndex = headers.indexOf(selectedFilterHeader);
-  
+
     const filteredData = fileData.filter((row) => {
       return row[filterColumnIndex]?.trim() === filterValue;
     });
-  
+
     try {
       const response = await fetch('http://localhost:8080/api/chart', {
         method: 'POST',
@@ -167,12 +171,12 @@ export default function DataVisualizer() {
           fileData: [headers, ...filteredData]
         })
       });
-  
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to generate chart');
       }
-  
+
       const data = await response.json();
       setChartHtml(data.html);
     } catch (error) {
@@ -206,11 +210,10 @@ export default function DataVisualizer() {
               onDragOver={onDragOver}
               onDragLeave={onDragLeave}
               onDrop={onDrop}
-              className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-                isDragging 
-                  ? 'border-blue-500 bg-blue-50' 
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
+              className={`relative border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragging
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-300 hover:border-gray-400'
+                }`}
             >
               <input
                 id="file-input"
@@ -265,11 +268,10 @@ export default function DataVisualizer() {
 
           {/* Upload Status Message */}
           {uploadStatus.message && uploadStatus.type !== 'progress' && (
-            <div className={`mt-4 p-4 rounded-md ${
-              uploadStatus.type === 'error'
-                ? 'bg-red-50 text-red-700'
-                : 'bg-green-50 text-green-700'
-            }`}>
+            <div className={`mt-4 p-4 rounded-md ${uploadStatus.type === 'error'
+              ? 'bg-red-50 text-red-700'
+              : 'bg-green-50 text-green-700'
+              }`}>
               <div className="flex items-center space-x-2">
                 {uploadStatus.type === 'error' ? (
                   <svg className="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -292,8 +294,8 @@ export default function DataVisualizer() {
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Generate Your Chart</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-            <div>
-              <label htmlFor="chart-type" className="block text-sm font-medium text-gray-700 mb-1">
+              <div>
+                <label htmlFor="chart-type" className="block text-sm font-medium text-gray-700 mb-1">
                   Chart Type
                 </label>
                 <select
@@ -367,44 +369,44 @@ export default function DataVisualizer() {
               </div>
 
               <div className="relative">
-  <label htmlFor="filter-value" className="block text-sm font-medium text-gray-700 mb-1">
-    Filter Value
-  </label>
-  <input
-    type="text"
-    className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-    placeholder="Search filter value..."
-    value={filterValue || filterSearchValue}
-    onChange={(e) => {
-      setFilterSearchValue(e.target.value);
-      setFilterValue('');
-      setIsDropdownOpen(true);
-    }}
-    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-  />
-  {isDropdownOpen && (
-    <div 
-      className="absolute z-10 w-full mt-1 bg-white shadow-lg max-h-60 rounded-md py-1 text-base overflow-auto"
-      onBlur={() => setIsDropdownOpen(false)}
-    >
-      {uniqueFilterValues
-        .filter(value => value.toLowerCase().includes(filterSearchValue.toLowerCase()))
-        .map((value, index) => (
-          <div
-            key={index}
-            className="cursor-pointer hover:bg-gray-100 px-3 py-2"
-            onClick={() => {
-              setFilterValue(value);
-              setFilterSearchValue('');
-              setIsDropdownOpen(false);
-            }}
-          >
-            {value}
-          </div>
-        ))}
-    </div>
-  )}
-</div>
+                <label htmlFor="filter-value" className="block text-sm font-medium text-gray-700 mb-1">
+                  Filter Value
+                </label>
+                <input
+                  type="text"
+                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                  placeholder="Search filter value..."
+                  value={filterValue || filterSearchValue}
+                  onChange={(e) => {
+                    setFilterSearchValue(e.target.value);
+                    setFilterValue('');
+                    setIsDropdownOpen(true);
+                  }}
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                />
+                {isDropdownOpen && (
+                  <div
+                    className="absolute z-10 w-full mt-1 bg-white shadow-lg max-h-60 rounded-md py-1 text-base overflow-auto"
+                    onBlur={() => setIsDropdownOpen(false)}
+                  >
+                    {uniqueFilterValues
+                      .filter(value => value.toLowerCase().includes(filterSearchValue.toLowerCase()))
+                      .map((value, index) => (
+                        <div
+                          key={index}
+                          className="cursor-pointer hover:bg-gray-100 px-3 py-2"
+                          onClick={() => {
+                            setFilterValue(value);
+                            setFilterSearchValue('');
+                            setIsDropdownOpen(false);
+                          }}
+                        >
+                          {value}
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <button
