@@ -190,16 +190,26 @@ export default function DataVisualizer() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Banner */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-6 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-4xl font-extrabold tracking-tight text-center">
-            ChartCraft
-          </h1>
-          <p className="mt-2 text-xl text-center text-blue-100">
-            Transform your data into stunning visualizations
-          </p>
-        </div>
+<div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-6 shadow-lg">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="flex justify-between items-center">
+      <div>
+        <h1 className="text-4xl font-extrabold tracking-tight">
+          ChartCraft
+        </h1>
+        <p className="mt-2 text-xl text-blue-100">
+          Transform your data into stunning visualizations
+        </p>
       </div>
+      <button
+        onClick={() => window.location.href = '/canvas'}
+        className="bg-white text-indigo-600 px-6 py-2 rounded-md font-semibold hover:bg-indigo-50 transition-colors"
+      >
+        Canvas
+      </button>
+    </div>
+  </div>
+</div>
 
       <div className="max-w-4xl mx-auto p-6 space-y-8">
         {/* Upload Section */}
