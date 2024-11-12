@@ -74,7 +74,7 @@ export default function DataVisualizer() {
   };
 
   const isValidFileType = (file) => {
-    return file && (file.name.toLowerCase().endsWith('.csv') || file.name.toLowerCase().endsWith('.xls') || file.name.toLowerCase().endsWith('.xlx'));
+    return file && (file.name.toLowerCase().endsWith('.csv') || file.name.toLowerCase().endsWith('.xls') || file.name.toLowerCase().endsWith('.xlsx'));
   };
 
   const handleFileUpload = async (e) => {
@@ -233,7 +233,7 @@ export default function DataVisualizer() {
               <input
                 id="file-input"
                 type="file"
-                accept=".xls, .xlx, .csv"
+                accept=".xls, .xlsx, .csv"s
                 onChange={handleFileChange}
                 className="hidden"
               />
