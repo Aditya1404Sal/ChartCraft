@@ -233,7 +233,7 @@ export default function DataVisualizer() {
               <input
                 id="file-input"
                 type="file"
-                accept=".xls, .xlsx, .csv"s
+                accept=".xls, .xlsx, .csv"
                 onChange={handleFileChange}
                 className="hidden"
               />
