@@ -1,6 +1,7 @@
 import csv
-from io import StringIO
-from flask import Flask, request, jsonify
+import pandas as pd
+from io import StringIO, BytesIO
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 
 from backend.plotter import generate_chart_plt
@@ -21,14 +22,32 @@ def upload_file():
     file = request.files['file']
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
-    if file:
+
+    filename = file.filename.lower()
+    if filename.endswith('.csv'):
+        # Read CSV file and convert to JSON format
         content = file.read().decode('utf-8')
-        csv_reader = csv.reader(StringIO(content))
-        records = list(csv_reader)
-        if len(records) < 2:
-            return jsonify({"error": "CSV file is empty or has insufficient data"}), 400
-        headers = records[0]
-        return jsonify({"headers": headers, "message": "File uploaded successfully"})
+        df = pd.read_csv(StringIO(content))
+    elif filename.endswith(('.xls', '.xlsx')):
+        # Read Excel file and convert to CSV for download
+        try:
+            df = pd.read_excel(file)
+            # Convert Excel file to CSV format
+            csv_output = BytesIO()
+            df.to_csv(csv_output, index=False)
+            csv_output.seek(0)  # Reset pointer to the start of the file
+            return send_file(csv_output, as_attachment=True, download_name='converted_file.csv', mimetype='text/csv')
+        except Exception as e:
+            return jsonify({"error": f"Failed to process Excel file: {str(e)}"}), 500
+    else:
+        return jsonify({"error": "Unsupported file format. Please upload a CSV, XLS, or XLSX file."}), 400
+
+    # Convert dataframe to JSON format with records orientation
+    json_data = df.to_dict(orient='records')
+    headers = list(df.columns)
+    
+    return jsonify({"headers": headers, "data": json_data, "message": "File uploaded successfully"})
+
 
 @app.route('/api/chart', methods=['POST'])
 def generate_chart():
@@ -40,18 +59,17 @@ def generate_chart():
     filter_value = request_data.get('filterValue')
     file_data = request_data.get('fileData')
 
-    if not all([chart_type, x_column is not None, y_column is not None, filter_column is not None, filter_value is not None, file_data]):
+    if not all([chart_type, x_column is not None, y_column is not None, file_data]):
         return jsonify({"error": "Invalid request body"}), 400
 
-    data = GradeData(file_data[0], file_data[1:])
-    
     try:
-        # Convert column indices from string to integer
-        x_column_index = int(x_column)
-        y_column_index = int(y_column)
-        filter_column_index = int(filter_column)
+        # Filter data based on filter_column and filter_value, if specified
+        data = pd.DataFrame(file_data)
+        if filter_column and filter_value:
+            data = data[data[filter_column] == filter_value]
 
-        chart_html = generate_chart_plt(chart_type, data, x_column_index, y_column_index, filter_column_index, filter_value)
+        # Pass filtered data to generate chart
+        chart_html = generate_chart_plt(chart_type, data, x_column, y_column)
         return jsonify({"html": chart_html})
     
     except Exception as e:
