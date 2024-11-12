@@ -74,7 +74,7 @@ export default function DataVisualizer() {
   };
 
   const isValidFileType = (file) => {
-    return file && file.name.toLowerCase().endsWith('.csv');
+    return file && (file.name.toLowerCase().endsWith('.csv') || file.name.toLowerCase().endsWith('.xls') || file.name.toLowerCase().endsWith('.xlsx'));
   };
 
   const handleFileUpload = async (e) => {
@@ -96,11 +96,16 @@ export default function DataVisualizer() {
       // Change the endpoint to match your server URL and path
       const response = await fetch('http://localhost:8080/api/upload', {
         method: 'POST',
+        headers: {
+          // Content-Type is usually set automatically with FormData
+        },
         body: formData
       });
 
       if (!response.ok) {
-        throw new Error('Upload failed');
+        const errorDetails = await response.text(); // or response.json() if it's in JSON format
+        console.error('Upload failed with status:', response.status, errorDetails);
+        throw new Error('Upload Failed');
       }
 
       const data = await response.json();
@@ -228,7 +233,7 @@ export default function DataVisualizer() {
               <input
                 id="file-input"
                 type="file"
-                accept=".csv"
+                accept=".xls, .xlsx, .csv"
                 onChange={handleFileChange}
                 className="hidden"
               />
