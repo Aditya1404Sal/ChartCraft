@@ -51,7 +51,7 @@ for the time being it merely does distribution processing which shows the data c
 # Work distribution:
 Aditya : Manage
 Harsh : 1/2 frontend + file parsing (excel) [Implement a function in python that takes in a .xlsv or .xls file and converts it into a csv file, make sure data is not lost]
-Riya : Help me w customization [Also implement HTML to svg Conversion,should be non-blocking and should allow users on the frontend to download it once it's converted] (javascript)
+Riya : Help me w customization [Also implement HTML to png Conversion,should be non-blocking and should allow users on the frontend to download it once it's converted] (javascript)
 Pranali : Tailwind CSS + 1/2 frontend [implement customization fields dynamically, like the parsed headers of a csv need to be presented in a form where users can describe the granularity of the chart]
 
 

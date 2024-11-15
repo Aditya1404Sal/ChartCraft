@@ -28,66 +28,86 @@ ChartJS.register(
   Legend
 );
 
-const ChartPreview = ({ data, chartType, xAxisLabel, yAxisLabel }) => {
-    const chartRef = useRef(null);
+const ChartPreview = ({ data, chartType, columnLabels }) => {
+  const chartRef = useRef(null);
 
-    const generateColors = (count) => {
-        return Array(count).fill(0).map(() => 
+  const generateColors = (count) => {
+      return Array(count).fill(0).map(() => 
           `rgba(${Math.random() * 255}, ${Math.random() * 255}, ${Math.random() * 255}, 0.5)`
-        );
-      };
+      );
+  };
 
-      
-  
-    const options = {
-      scales: {
-        x: {
-          title: {
-            display: true,
-            text: xAxisLabel || 'X-Axis'
-          }
-        },
-        y: {
-          title: {
-            display: true,
-            text: yAxisLabel || 'Y-Axis'
-          }
-        }
+  // Group data by X-axis values
+  const groupedData = data.reduce((acc, row) => {
+      const xValue = row[0];
+      if (!acc[xValue]) {
+          acc[xValue] = [];
       }
-    };
+      // Collect all Y values (columns after the first one)
+      for (let i = 1; i < row.length; i++) {
+          if (row[i] !== undefined) {
+              if (!acc[xValue][i-1]) acc[xValue][i-1] = [];
+              acc[xValue][i-1].push(row[i]);
+          }
+      }
+      return acc;
+  }, {});
 
-    const pieOptions = {
-        plugins: {
-            legend: {
-                display: true,
-                position: 'right',
-                title: {
-                    display: true,
-                    text: yAxisLabel || 'Values'
-                }
-            },
+  const options = {
+    scales: {
+        x: {
             title: {
                 display: true,
-                text: xAxisLabel || 'Categories',
-                position: 'bottom',
-                padding: {
-                    top: 10,
-                    bottom: 10
-                }
+                text: columnLabels[0] || 'X-Axis'
+            }
+        },
+        y: {
+            title: {
+                display: true,
+                text: columnLabels[1] || 'Y-Axis'
             }
         }
-    };
-  
-    const chartData = {
-        labels: data.map(row => row[0]),
-        datasets: [{
-          label: yAxisLabel || 'Values',
-          data: data.map(row => row[1]),
-          backgroundColor: chartType === 'pie' 
-            ? generateColors(data.length)  // Different color for each pie slice
-            : `rgba(${Math.random() * 255}, ${Math.random() * 255}, ${Math.random() * 255}, 0.5)`,
-        }]
-      };
+    },
+    plugins: {
+        legend: {
+            display: true,
+            position: 'top'
+        }
+    }
+};
+
+
+const pieOptions = {
+  plugins: {
+      legend: {
+          display: true,
+          position: 'right',
+          title: {
+              display: true,
+              text: columnLabels[1] || 'Values'
+          }
+      },
+      title: {
+          display: true,
+          text: columnLabels[0] || 'Categories',
+          position: 'bottom'
+      }
+  }
+};
+
+const chartData = {
+  labels: Object.keys(groupedData),
+  datasets: Object.values(groupedData)[0]?.map((_, colIndex) => ({
+    label: columnLabels[colIndex + 1] || `Series ${colIndex + 1}`,
+      data: Object.values(groupedData).map(yValues => yValues[colIndex]?.[0] || 0),
+      backgroundColor: chartType === 'pie' 
+          ? generateColors(Object.keys(groupedData).length)
+          : `rgba(${Math.random() * 255}, ${Math.random() * 255}, ${Math.random() * 255}, 0.5)`,
+      borderColor: chartType === 'line' 
+          ? `rgba(${Math.random() * 255}, ${Math.random() * 255}, ${Math.random() * 255}, 1)`
+          : undefined
+  })) || []
+};
 
       const downloadChart = async () => {
         try {
