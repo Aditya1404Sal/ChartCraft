@@ -189,7 +189,6 @@ export default function DataVisualizer() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Banner */}
 <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-6 shadow-lg">
   <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div className="flex justify-between items-center">
@@ -212,7 +211,6 @@ export default function DataVisualizer() {
 </div>
 
       <div className="max-w-4xl mx-auto p-6 space-y-8">
-        {/* Upload Section */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-2xl font-bold text-gray-800 mb-4">Upload Your Data</h2>
           <form onSubmit={handleFileUpload} className="space-y-4">
@@ -276,7 +274,6 @@ export default function DataVisualizer() {
             </button>
           </form>
 
-          {/* Upload Status Message */}
           {uploadStatus.message && uploadStatus.type !== 'progress' && (
             <div className={`mt-4 p-4 rounded-md ${uploadStatus.type === 'error'
               ? 'bg-red-50 text-red-700'
@@ -298,7 +295,6 @@ export default function DataVisualizer() {
           )}
         </div>
 
-        {/* Chart Generation Section */}
         {headers.length > 0 && (
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Generate Your Chart</h2>
