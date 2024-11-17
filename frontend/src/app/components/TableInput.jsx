@@ -2,11 +2,52 @@
 // components/TableInput.js
 import { useState, useEffect } from 'react';
 
-const TableInput = ({ data, setData, chartType, columnLabels, setColumnLabels }) => {
-  // Remove the local columnLabels state since it's now passed as a prop
+const TableInput = ({ data, setData, chartType, columnLabels = [], setColumnLabels }) => {
   const [rows, setRows] = useState(3);
   const [cols, setCols] = useState(2);
   const [columnTypes, setColumnTypes] = useState(['number', 'number']);
+
+  const determineColumnTypes = (data) => {
+    if (!data || !data[0]) return [];
+    
+    return data[0].map((_, colIndex) => {
+        // Check first two rows to determine type
+        const firstTwoValues = data.slice(0, 2).map(row => row[colIndex]);
+        
+        // If any value is NaN when converted to number, treat as text
+        const isNumeric = firstTwoValues.every(value => 
+            !isNaN(value) && value !== '' && value !== null
+        );
+        
+        return isNumeric ? 'number' : 'text';
+    });
+};
+
+  // Initialize columnLabels if empty
+  useEffect(() => {
+    if (data && data.length > 0) {
+        setRows(data.length);
+        setCols(data[0].length);
+        const columnTypes = determineColumnTypes(data);
+        setColumnTypes(columnTypes);
+        // Only set initial labels if none exist
+        if (!columnLabels.length) {
+            const initialLabels = Array(data[0].length).fill(0)
+                .map((_, i) => `Column ${i + 1}`);
+            setColumnLabels(initialLabels);
+        }
+    } else {
+        // Fall back to default initialization
+        const initialData = Array(rows).fill().map(() => Array(cols).fill(''));
+        setData(initialData);
+        if (!columnLabels.length) {
+            const initialLabels = Array(cols).fill(0)
+                .map((_, i) => `Column ${i + 1}`);
+            setColumnLabels(initialLabels);
+        }
+    }
+}, [data]);
+
   const handleLabelChange = (colIndex, newLabel) => {
     const newLabels = [...columnLabels];
     newLabels[colIndex] = newLabel;
