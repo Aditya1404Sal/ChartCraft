@@ -53,12 +53,6 @@ const StatisticalAnalysisPanel = ({ onMethodSelect }) => {
             { id: "linear_regression", name: "Simple Linear Regression", description: "Model linear relationships" },
           ]
         },
-        categorical: {
-          name: "Categorical Analysis",
-          methods: [
-            { id: "chi_square", name: "Chi-Square Test", description: "Test categorical independence" },
-          ]
-        },
         comparison: {
           name: "Group Comparison",
           methods: [

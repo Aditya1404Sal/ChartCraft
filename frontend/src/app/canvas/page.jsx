@@ -109,7 +109,7 @@ const Home = () => {
         <div className="container mx-auto p-6">
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-6 px-8 rounded-lg shadow-md mb-8">
-            <h1 className="text-3xl font-bold">StatCraft</h1>
+            <h1 className="text-3xl font-bold">ChartCraft</h1>
             <p className="text-blue-100 mt-2">Advanced Statistical Analysis Platform</p>
           </div>
 

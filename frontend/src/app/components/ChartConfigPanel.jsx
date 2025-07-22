@@ -103,14 +103,14 @@ const ChartConfigPanel = ({
           setChartType('boxplot');
           break;
         }
-        case 'boxplot' : {
+        case 'boxplot': {
           const sorted = [...values].sort((a, b) => a - b);
           const boxPlotData = createBoxPlotData(sorted);
           setChartData(boxPlotData);
           setChartType('boxplot');
           break;
         }
-        case 'histogram' : {
+        case 'histogram': {
           const sorted = [...values].sort((a, b) => a - b);
           const histogramData = createHistogramData(sorted);
           setChartData(histogramData);
@@ -187,6 +187,7 @@ const ChartConfigPanel = ({
           const histogramData = createSkewnessHistogram(values, mean, std, skewness);
           setChartData(histogramData);
           setChartType('skewness');
+          console.log(chartData);
           break;
         }
 
@@ -222,7 +223,7 @@ const ChartConfigPanel = ({
           setChartType('kurtosis');
           break;
         }
-        // Add remaining skewness test, kurtosis test, normality test (working model because current version doesn't work)
+        // Add remaining skewness test, kurtosis test
       }
     } else if (selectedAnalysis === "bivariate") {
       console.log('Calculating results with:', {
@@ -317,19 +318,6 @@ const ChartConfigPanel = ({
           setChartType('regression');
           break;
         }
-        case 'chi_square': {
-          const { statistic, pValue } = calculateChiSquare(values1, values2);
-          setResults({
-            value: statistic.toFixed(4),
-            label: 'Chi-Square Statistic',
-            interpretation: `p-value: ${pValue.toFixed(4)} (${pValue < 0.05 ? 'Significant' : 'Not significant'})`
-          });
-
-          const visualData = transformData(values1,values2);
-          setChartData(visualData);
-          setChartType('chi_square');
-          break;
-        }
         case 'ttest': {
           const { statistic, pValue } = calculateTTest(values1, values2);
           setResults({
@@ -338,57 +326,13 @@ const ChartConfigPanel = ({
             interpretation: `p-value: ${pValue.toFixed(4)} (${pValue < 0.05 ? 'Significant' : 'Not significant'})`
           });
 
-          const boxPlotData = createDualBoxPlotData(values1, values2,selectedColumns);
+          const boxPlotData = createDualBoxPlotData(values1, values2, selectedColumns);
           setChartData(boxPlotData);
           setChartType('dualBoxPlot');
           break;
         }
       }
-      // get the column 1 and column 2 data here and then have a switch statement going through the different methods and do needed statistical grapphing
     }
-  };
-
-  //chi-square visual-transformer
-  const transformData = (values1, values2) => {
-    // Get unique categories
-    const categories = Array.from(new Set([...values1, ...values2])).sort();
-    
-    // Calculate observed frequencies
-    const observed1 = categories.map(cat => values1.filter(v => v === cat).length);
-    const observed2 = categories.map(cat => values2.filter(v => v === cat).length);
-    
-    // Calculate expected frequencies
-    const n1 = values1.length;
-    const n2 = values2.length;
-    const expected = categories.map(cat => {
-      const totalInCategory = observed1[categories.indexOf(cat)] + observed2[categories.indexOf(cat)];
-      return {
-        group1: (totalInCategory * n1) / (n1 + n2),
-        group2: (totalInCategory * n2) / (n1 + n2)
-      };
-    });
-
-    // Calculate chi-square contributions
-    const contributions = categories.map((cat, i) => {
-      const contrib1 = Math.pow(observed1[i] - expected[i].group1, 2) / expected[i].group1;
-      const contrib2 = Math.pow(observed2[i] - expected[i].group2, 2) / expected[i].group2;
-      return contrib1 + contrib2;
-    });
-
-    // Prepare data for visualization
-    return {
-      frequencies: categories.map((cat, i) => ({
-        category: cat.toString(),
-        'Observed Group 1': observed1[i],
-        'Expected Group 1': expected[i].group1,
-        'Observed Group 2': observed2[i],
-        'Expected Group 2': expected[i].group2,
-      })),
-      contributions: categories.map((cat, i) => ({
-        category: cat.toString(),
-        contribution: contributions[i],
-      }))
-    };
   };
 
   const createBoxPlotData = (sorted) => {
@@ -426,163 +370,91 @@ const ChartConfigPanel = ({
     ];
   };
 
-  // Chi-square test calculation
-const calculateChiSquare = (values1, values2) => {
-  // Create frequency tables
-  const freqTable1 = {};
-  const freqTable2 = {};
-  const uniqueValues = new Set([...values1, ...values2]);
+  // T-test calculation (independent two-sample t-test)
+  const calculateTTest = (values1, values2) => {
+    // Calculate means
+    const mean1 = values1.reduce((acc, val) => acc + val, 0) / values1.length;
+    const mean2 = values2.reduce((acc, val) => acc + val, 0) / values2.length;
 
-  uniqueValues.forEach(value => {
-    freqTable1[value] = values1.filter(v => v === value).length;
-    freqTable2[value] = values2.filter(v => v === value).length;
-  });
+    // Calculate variances
+    const variance1 = values1.reduce((acc, val) => acc + (val - mean1) ** 2, 0) / (values1.length - 1);
+    const variance2 = values2.reduce((acc, val) => acc + (val - mean2) ** 2, 0) / (values2.length - 1);
 
-  // Calculate expected frequencies
-  const n1 = values1.length;
-  const n2 = values2.length;
-  const chiSquare = Array.from(uniqueValues).reduce((acc, value) => {
-    const o1 = freqTable1[value] || 0;
-    const o2 = freqTable2[value] || 0;
-    const e1 = (n1 * (o1 + o2)) / (n1 + n2);
-    const e2 = (n2 * (o1 + o2)) / (n1 + n2);
-    
-    return acc + ((o1 - e1) ** 2) / e1 + ((o2 - e2) ** 2) / e2;
-  }, 0);
+    // Pooled standard error
+    const pooledSE = Math.sqrt(variance1 / values1.length + variance2 / values2.length);
 
-  // Calculate degrees of freedom
-  const df = uniqueValues.size - 1;
-  
-  // Calculate p-value using chi-square distribution approximation
-  const pValue = 1 - chiSquareCDF2(chiSquare, df);
+    // Calculate t-statistic
+    const tStatistic = (mean1 - mean2) / pooledSE;
 
-  return { statistic: chiSquare, pValue };
-};
+    // Calculate degrees of freedom (Welch–Satterthwaite equation)
+    const df = ((variance1 / values1.length + variance2 / values2.length) ** 2) /
+      (((variance1 / values1.length) ** 2) / (values1.length - 1) +
+        ((variance2 / values2.length) ** 2) / (values2.length - 1));
 
-// T-test calculation (independent two-sample t-test)
-const calculateTTest = (values1, values2) => {
-  // Calculate means
-  const mean1 = values1.reduce((acc, val) => acc + val, 0) / values1.length;
-  const mean2 = values2.reduce((acc, val) => acc + val, 0) / values2.length;
+    // Calculate p-value using t-distribution approximation
+    const pValue = 2 * (1 - studentTCDF(Math.abs(tStatistic), df));
 
-  // Calculate variances
-  const variance1 = values1.reduce((acc, val) => acc + (val - mean1) ** 2, 0) / (values1.length - 1);
-  const variance2 = values2.reduce((acc, val) => acc + (val - mean2) ** 2, 0) / (values2.length - 1);
-
-  // Pooled standard error
-  const pooledSE = Math.sqrt(variance1 / values1.length + variance2 / values2.length);
-
-  // Calculate t-statistic
-  const tStatistic = (mean1 - mean2) / pooledSE;
-
-  // Calculate degrees of freedom (Welch–Satterthwaite equation)
-  const df = ((variance1 / values1.length + variance2 / values2.length) ** 2) /
-    (((variance1 / values1.length) ** 2) / (values1.length - 1) +
-     ((variance2 / values2.length) ** 2) / (values2.length - 1));
-
-  // Calculate p-value using t-distribution approximation
-  const pValue = 2 * (1 - studentTCDF(Math.abs(tStatistic), df));
-
-  return { statistic: tStatistic, pValue };
-};
-
-// Helper function: Chi-square CDF approximation
-const chiSquareCDF2 = (x, df) => {
-  const gamma = (z) => {
-    if (z === 1) return 1;
-    if (z === 0.5) return Math.sqrt(Math.PI);
-    return (z - 1) * gamma(z - 1);
+    return { statistic: tStatistic, pValue };
   };
 
-  const lowerGamma = (s, x) => {
-    const steps = 100;
-    const h = x / steps;
-    let sum = 0;
-    
-    for (let i = 0; i < steps; i++) {
-      const t = i * h;
-      sum += h * (t ** (s - 1) * Math.exp(-t));
-    }
-    
-    return sum;
+
+  // Helper function: Student's t-distribution CDF approximation
+  const studentTCDF = (t, df) => {
+    const x = df / (df + t * t);
+    return 1 - 0.5 * incompleteBeta(df / 2, 0.5, x);
   };
 
-  return lowerGamma(df / 2, x / 2) / gamma(df / 2);
-};
+  // Helper function: Incomplete beta function approximation
+  const incompleteBeta = (a, b, x) => {
+    const betaFunction = (a, b) => {
+      return Math.exp(
+        logGamma(a) + logGamma(b) - logGamma(a + b)
+      );
+    };
 
-// Helper function: Student's t-distribution CDF approximation
-const studentTCDF = (t, df) => {
-  const x = df / (df + t * t);
-  return 1 - 0.5 * incompleteBeta(df / 2, 0.5, x);
-};
+    const logGamma = (z) => {
+      const c = [
+        76.18009172947146,
+        -86.50532032941677,
+        24.01409824083091,
+        -1.231739572450155,
+        0.1208650973866179e-2,
+        -0.5395239384953e-5
+      ];
+      let sum = 1.000000000190015;
+      for (let i = 0; i < 6; i++) {
+        sum += c[i] / (z + i + 1);
+      }
+      return (
+        (Math.log(2.5066282746310005 * sum) - 5.0) +
+        (z + 0.5) * Math.log(z + 4.5) -
+        (z + 4.5)
+      );
+    };
 
-// Helper function: Incomplete beta function approximation
-const incompleteBeta = (a, b, x) => {
-  const betaFunction = (a, b) => {
-    return Math.exp(
-      logGamma(a) + logGamma(b) - logGamma(a + b)
+    const series = (a, b, x) => {
+      let term = 1;
+      let sum = 1;
+      for (let n = 0; n < 200; n++) {
+        term *= (a + n) * x / (b + n);
+        sum += term;
+        if (Math.abs(term) < 1e-10) break;
+      }
+      return sum;
+    };
+
+    if (x === 0) return 0;
+    if (x === 1) return 1;
+
+    const bt = Math.exp(
+      logGamma(a + b) - logGamma(a) - logGamma(b) +
+      a * Math.log(x) + b * Math.log(1 - x)
     );
+
+    return x < (a + 1) / (a + b + 2)
+      ? bt * series(a, a + b, x) / a
+      : 1 - bt * series(b, a + b, 1 - x) / b;
   };
-
-  const logGamma = (z) => {
-    const c = [
-      76.18009172947146,
-      -86.50532032941677,
-      24.01409824083091,
-      -1.231739572450155,
-      0.1208650973866179e-2,
-      -0.5395239384953e-5
-    ];
-    let sum = 1.000000000190015;
-    for (let i = 0; i < 6; i++) {
-      sum += c[i] / (z + i + 1);
-    }
-    return (
-      (Math.log(2.5066282746310005 * sum) - 5.0) +
-      (z + 0.5) * Math.log(z + 4.5) -
-      (z + 4.5)
-    );
-  };
-
-  const series = (a, b, x) => {
-    let term = 1;
-    let sum = 1;
-    for (let n = 0; n < 200; n++) {
-      term *= (a + n) * x / (b + n);
-      sum += term;
-      if (Math.abs(term) < 1e-10) break;
-    }
-    return sum;
-  };
-
-  if (x === 0) return 0;
-  if (x === 1) return 1;
-
-  const bt = Math.exp(
-    logGamma(a + b) - logGamma(a) - logGamma(b) +
-    a * Math.log(x) + b * Math.log(1 - x)
-  );
-
-  return x < (a + 1) / (a + b + 2)
-    ? bt * series(a, a + b, x) / a
-    : 1 - bt * series(b, a + b, 1 - x) / b;
-};
-
-// Visualization helper for Chi-square test
-const createContingencyTable = (values1, values2) => {
-  const uniqueValues = Array.from(new Set([...values1, ...values2])).sort((a, b) => a - b);
-  
-  return uniqueValues.map(val1 => ({
-    name: val1.toString(),
-    ...Object.fromEntries(
-      uniqueValues.map(val2 => [
-        val2.toString(),
-        values1.filter(v1 => v1 === val1).length +
-        values2.filter(v2 => v2 === val2).length
-      ])
-    )
-  }));
-};
 
   // Helper functions for data processing
   const createHistogramData = (values) => {
@@ -617,37 +489,37 @@ const createContingencyTable = (values1, values2) => {
     const n = x.length;
     const meanX = x.reduce((a, b) => a + b) / n;
     const meanY = y.reduce((a, b) => a + b) / n;
-    
+
     const covXY = x.reduce((acc, xi, i) => acc + (xi - meanX) * (y[i] - meanY), 0) / n;
     const varX = x.reduce((acc, xi) => acc + Math.pow(xi - meanX, 2), 0) / n;
     const varY = y.reduce((acc, yi) => acc + Math.pow(yi - meanY, 2), 0) / n;
-    
+
     const coefficient = covXY / Math.sqrt(varX * varY);
     const zScore = Math.sqrt(n - 3) * 0.5 * Math.log((1 + coefficient) / (1 - coefficient));
     const pValue = 2 * (1 - normalCDF(Math.abs(zScore)));
-    
+
     return { coefficient, pValue };
   };
 
   const calculateSpearmanCorrelation = (x, y) => {
     const n = x.length;
-    
+
     // Convert to ranks
     const xRanks = getRanks(x);
     const yRanks = getRanks(y);
-    
+
     return calculatePearsonCorrelation(xRanks, yRanks);
   };
 
   const getRanks = (arr) => {
     const sorted = arr.map((v, i) => ({ value: v, index: i }))
       .sort((a, b) => a.value - b.value);
-    
+
     const ranks = new Array(arr.length);
     for (let i = 0; i < sorted.length; i++) {
       ranks[sorted[i].index] = i + 1;
     }
-    
+
     return ranks;
   };
 
@@ -655,24 +527,24 @@ const createContingencyTable = (values1, values2) => {
     const n = x.length;
     const meanX = x.reduce((a, b) => a + b) / n;
     const meanY = y.reduce((a, b) => a + b) / n;
-    
+
     let numerator = 0;
     let denominator = 0;
-    
+
     for (let i = 0; i < n; i++) {
       numerator += (x[i] - meanX) * (y[i] - meanY);
       denominator += Math.pow(x[i] - meanX, 2);
     }
-    
+
     const slope = numerator / denominator;
     const intercept = meanY - slope * meanX;
-    
+
     // Calculate R-squared
     const yPred = x.map(xi => slope * xi + intercept);
     const ssRes = y.reduce((acc, yi, i) => acc + Math.pow(yi - yPred[i], 2), 0);
     const ssTot = y.reduce((acc, yi) => acc + Math.pow(yi - meanY, 2), 0);
     const rSquared = 1 - ssRes / ssTot;
-    
+
     return { slope, intercept, rSquared };
   };
 
@@ -695,32 +567,35 @@ const createContingencyTable = (values1, values2) => {
     const scatterData = createScatterData(x, y);
     const minX = Math.min(...x);
     const maxX = Math.max(...x);
-    
+
     // Add regression line points
     const regressionLine = [
       { x: minX, y: slope * minX + intercept },
       { x: maxX, y: slope * maxX + intercept }
     ];
-    
+
     return { scatter: scatterData, line: regressionLine };
   };
 
   const createSkewnessHistogram = (values, mean, std, skewness) => {
     const histData = createHistogramData(values);
 
-    // Add theoretical normal curve for comparison
     const x = Array.from({ length: 100 }, (_, i) =>
       mean - 3 * std + (6 * std * i) / 99
     );
-    const normalCurve = x.map(xi => ({
-      x: xi,
-      y: (1 / (std * Math.sqrt(2 * Math.PI))) *
-        Math.exp(-Math.pow(xi - mean, 2) / (2 * std * std))
-    }));
+    const adjustedNormalCurve = x.map(xi => {
+      const z = (xi - mean) / std;
+      const skewAdjustment = 1 + skewness * Math.pow(z, 3);
+      return {
+        x: xi,
+        y: (1 / (std * Math.sqrt(2 * Math.PI))) *
+          Math.exp(-Math.pow(xi - mean, 2) / (2 * std * std)) * skewAdjustment
+      };
+    });
 
     return {
       histogram: histData,
-      normal: normalCurve,
+      normal: adjustedNormalCurve,
       skewness
     };
   };
@@ -728,22 +603,29 @@ const createContingencyTable = (values1, values2) => {
   const createKurtosisHistogram = (values, mean, std, kurtosis) => {
     const histData = createHistogramData(values);
 
-    // Add theoretical normal curve for comparison
+    // Generate x values for the normal curve
     const x = Array.from({ length: 100 }, (_, i) =>
       mean - 3 * std + (6 * std * i) / 99
     );
-    const normalCurve = x.map(xi => ({
-      x: xi,
-      y: (1 / (std * Math.sqrt(2 * Math.PI))) *
-        Math.exp(-Math.pow(xi - mean, 2) / (2 * std * std))
-    }));
+
+    // Adjust the normal curve based on kurtosis
+    const adjustedNormalCurve = x.map(xi => {
+      const z = (xi - mean) / std;
+      const kurtosisAdjustment = 1 + kurtosis * (Math.pow(z, 4) - 3); // Excess kurtosis modifies the tails
+      return {
+        x: xi,
+        y: (1 / (std * Math.sqrt(2 * Math.PI))) *
+          Math.exp(-Math.pow(xi - mean, 2) / (2 * std * std)) * kurtosisAdjustment
+      };
+    });
 
     return {
       histogram: histData,
-      normal: normalCurve,
+      normal: adjustedNormalCurve,
       kurtosis
     };
   };
+
 
   const renderChart = () => {
     if (!chartData || !chartType) return null;
@@ -751,11 +633,11 @@ const createContingencyTable = (values1, values2) => {
     switch (chartType) {
       case 'bar':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <RechartsBarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="range" />
-              <YAxis />
+          <ResponsiveContainer width="100%" height={400}>
+            <RechartsBarChart data={chartData} margin={{ bottom: 40, left: 25, top: 15 }} padding="20px">
+              <CartesianGrid strokeDasharray="4 4" />
+              <XAxis dataKey="range" label={{ value: selectedColumns[0], position: 'insideBottom', offset: -20 }} />
+              <YAxis label={{ value: selectedColumns[1], angle: -90, position: 'insideLeft', offset: -14 }} />
               <Tooltip />
               <Bar dataKey="frequency" fill="#8884d8" />
             </RechartsBarChart>
@@ -764,11 +646,11 @@ const createContingencyTable = (values1, values2) => {
 
       case 'line':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="index" />
-              <YAxis />
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart data={chartData} margin={{ bottom: 40, left: 25, top: 15, }} padding="20px">
+              <CartesianGrid strokeDasharray="4 4" />
+              <XAxis dataKey="index" label={{ value: selectedColumns[0], position: 'insideBottom', offset: -20 }} />
+              <YAxis label={{ value: selectedColumns[1], angle: -90, position: 'insideLeft', offset: -14 }} />
               <Tooltip />
               <Line type="monotone" dataKey="value" stroke="#8884d8" />
               {chartData[0]?.mean && (
@@ -784,7 +666,7 @@ const createContingencyTable = (values1, values2) => {
 
       case 'boxplot':
         return (
-          <div style={{ width: '100%', height: '300px' }}>
+          <div style={{ width: '100%', height: '400px' }}>
             <Plot
               data={chartData}
               layout={{
@@ -805,7 +687,7 @@ const createContingencyTable = (values1, values2) => {
 
       case 'dualBoxPlot':
         return (
-          <div style={{ width: '100%', height: '300px' }}>
+          <div style={{ width: '100%', height: '400px' }}>
             <Plot
               data={chartData}
               layout={{
@@ -826,11 +708,11 @@ const createContingencyTable = (values1, values2) => {
 
       case 'scatter':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <ScatterChart>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="x" type="number" />
-              <YAxis dataKey="y" type="number" />
+          <ResponsiveContainer width="100%" height={400}>
+            <ScatterChart margin={{ bottom: 40, left: 25, top: 15, }} padding="20px">
+              <CartesianGrid strokeDasharray="4 4" />
+              <XAxis dataKey="x" type="number" label={{ value: selectedColumns[0], position: 'insideBottom', offset: -20 }} />
+              <YAxis dataKey="y" type="number" label={{ value: selectedColumns[1], angle: -90, position: 'insideLeft', offset: -14 }} />
               <Tooltip cursor={{ strokeDasharray: '3 3' }} />
               <Scatter data={chartData} fill="#8884d8" />
             </ScatterChart>
@@ -839,20 +721,21 @@ const createContingencyTable = (values1, values2) => {
 
       case 'regression':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <ScatterChart>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="x" type="number" />
-              <YAxis dataKey="y" type="number" />
+          <ResponsiveContainer width="100%" height={400}>
+            <ScatterChart margin={{ bottom: 40, left: 25, top: 15, }} padding="20px">
+              <CartesianGrid strokeDasharray="4 4" />
+              <XAxis dataKey="x" type="number" label={{ value: selectedColumns[0], position: 'insideBottom', offset: -20 }} />
+              <YAxis dataKey="y" type="number" label={{ value: selectedColumns[1], angle: -90, position: 'insideLeft', offset: -14 }} />
               <Tooltip cursor={{ strokeDasharray: '3 3' }} />
               <Scatter data={chartData.scatter} fill="#8884d8" />
               <Line
-                data={chartData.line}
-                type="linear"
-                dataKey="y"
-                stroke="#ff7300"
+                type="monotone"
+                data={chartData.line} // The regression line data
+                stroke="#ff7300" // Color of the line
                 dot={false}
+                strokeDasharray="3 3" // No dots on the regression line
               />
+
             </ScatterChart>
           </ResponsiveContainer>
         );
@@ -860,11 +743,11 @@ const createContingencyTable = (values1, values2) => {
       case 'skewness':
       case 'kurtosis':
         return (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="range" />
-              <YAxis />
+          <ResponsiveContainer width="100%" height={400}>
+            <LineChart margin={{ bottom: 40, left: 25, top: 15, }} padding="20px">
+              <CartesianGrid strokeDasharray="4 4" />
+              <XAxis dataKey="range" label={{ value: selectedColumns[0], position: 'insideBottom', offset: -20 }} />
+              <YAxis label={{ value: selectedColumns[1], angle: -90, position: 'insideLeft', offset: -14 }} />
               <Tooltip />
               <Bar
                 dataKey="frequency"
@@ -882,112 +765,6 @@ const createContingencyTable = (values1, values2) => {
             </LineChart>
           </ResponsiveContainer>
         );
-
-      case 'normality':
-        return (
-          <div className="grid grid-cols-2 gap-4 h-[300px]">
-            {/* Q-Q Plot */}
-            <ResponsiveContainer>
-              <ScatterChart>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" dataKey="theoretical" name="Theoretical Quantiles" />
-                <YAxis type="number" dataKey="observed" name="Sample Quantiles" />
-                <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-                <Scatter data={chartData} fill="#8884d8" />
-                <Line
-                  type="monotone"
-                  data={[
-                    { theoretical: -3, observed: -3 },
-                    { theoretical: 3, observed: 3 }
-                  ]}
-                  dataKey="observed"
-                  stroke="#ff7300"
-                  dot={false}
-                />
-              </ScatterChart>
-            </ResponsiveContainer>
-
-            {/* Histogram with Normal Curve */}
-            <ResponsiveContainer>
-              <LineChart>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="range" />
-                <YAxis />
-                <Tooltip />
-                <Bar
-                  dataKey="frequency"
-                  data={chartData.histogram}
-                  fill="#8884d8"
-                  opacity={0.7}
-                />
-                <Line
-                  type="monotone"
-                  data={chartData.normal}
-                  dataKey="y"
-                  stroke="#ff7300"
-                  dot={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        );
-
-        case 'chi_square': {
-          return (
-            <div className="space-y-6">
-              {/* Frequencies Comparison */}
-              <div className="h-[400px]">
-                <h3 className="text-center text-sm font-medium mb-2">
-                  Observed vs Expected Frequencies
-                </h3>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={chartData.frequencies}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="category" />
-                    <YAxis />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="Observed Group 1" fill="#8884d8" />
-                    <Bar dataKey="Expected Group 1" fill="#8884d8" fillOpacity={0.4} />
-                    <Bar dataKey="Observed Group 2" fill="#82ca9d" />
-                    <Bar dataKey="Expected Group 2" fill="#82ca9d" fillOpacity={0.4} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-    
-              {/* Chi-square Contributions */}
-              <div className="h-[300px]">
-                <h3 className="text-center text-sm font-medium mb-2">
-                  Chi-square Statistic Contributions by Category
-                </h3>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={chartData.contributions}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="category" />
-                    <YAxis />
-                    <Tooltip
-                      formatter={(value) => [`Contribution: ${value.toFixed(3)}`, '']}
-                    />
-                    <Bar dataKey="contribution" fill="#ff7300">
-                      {chartData.contributions.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.contribution > 3.841 ? '#ff4444' : '#ff7300'}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          );
-        }
 
       default:
         return null;
@@ -1068,8 +845,8 @@ const createContingencyTable = (values1, values2) => {
               {/* Calculate Button */}
               <button
                 className={`w-full py-2 px-4 rounded-md transition-colors ${selectedColumns.length > 0
-                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
                   }`}
                 disabled={selectedColumns.length === 0}
                 onClick={calculateResults}
@@ -1095,8 +872,7 @@ const createContingencyTable = (values1, values2) => {
 
               {/* Chart Display */}
               {chartData && (
-                <div className="border rounded-lg p-4">
-                  <h3 className="font-medium mb-4">Visualization</h3>
+                <div className="border rounded-lg p-5">
                   {renderChart()}
                 </div>
               )}

@@ -14,6 +14,8 @@ def generate_chart_plt(chart_type, data, x_column, y_column, filter_column, filt
     if not filtered_rows:
         raise ValueError("No data available after filtering")
 
+    filtered_rows.sort(key=lambda row: row[x_column])
+
     x_values = [row[x_column] for row in filtered_rows]
     
     y_values = []
@@ -22,7 +24,7 @@ def generate_chart_plt(chart_type, data, x_column, y_column, filter_column, filt
         try:
             value, suffix = normalize_value(row[y_column].replace(',', '').replace('"', '').strip())
             y_values.append(value)
-            y_suffix = suffix  # Assume all values in the column have the same suffix
+            y_suffix = suffix 
         except ValueError as ve:
             raise ValueError("Non-numeric value found in Y column") from ve
 
